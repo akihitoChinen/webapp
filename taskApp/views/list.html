@@ -1,0 +1,174 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta http-equiv="Content-Security-Policy" content="default-src * data: gap: content: https://ssl.gstatic.com; style-src * 'unsafe-inline'; script-src * 'unsafe-inline' 'unsafe-eval'">
+
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chinrn App</title>
+    <!-- BootstrapのCSS読み込み -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="font/css/open-iconic-bootstrap.css" rel="stylesheet">
+    <!-- jQuery読み込み -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <!-- BootstrapのJS読み込み -->
+    <script src="js/bootstrap.min.js"></script>
+</head>
+<body onload="initLoad()">
+    <p class="text-center display-2">test2</p>
+
+      追加タスク：
+      <input type="text" id="submitContent" name="content"><br>
+      開始時刻：
+      <select name="startTime" id="submitStime">
+      	<option>09:00</option>
+      	<option>09:30</option>
+      	<option>10:00</option>
+     	<option>10:30</option>
+      </select>
+      所要時間：
+      <select name="requiredTime" id="submitRtime">
+      	<option>15min</option>
+      	<option>30min</option>
+      	<option>1h</option>
+     	<option>1.5h</option>
+      </select><br>
+      備考：
+      <input type="text" id="submitRemarks" name="remarks">
+      <input type="button" onclick="registData()" value="+">
+    <form action="./regist" method="get">
+    </form>
+    <br>
+
+    <table border="1" id="tbl">
+    	<tr>
+    		<th width="30"></th>
+    		<th width="200">内容</th>
+    		<th width="80">開始時刻</th>
+    		<th width="80">所要時間</th>
+    		<th width="200">備考</th>
+    		<th width="40"></th>
+    	</tr>
+    </table>
+
+</body>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io.connect();
+    socket.on("server_to_client", function(data){
+        console.log("dataNum : " + data.value.length);
+        let tasks = data.value;
+
+        const tbl = document.getElementById('tbl');
+
+        // table初期化
+        for ( let i = tbl.rows.length-1; i > 0; i--){
+            tbl.deleteRow(i);
+        }
+
+        for(let i=0; i<tasks.length; i++) {
+            // 一行追加
+            const row = tbl.insertRow(-1);
+            row.insertCell(0);
+            row.insertCell(1);
+            row.insertCell(2);
+            row.insertCell(3);
+            row.insertCell(4);
+            row.insertCell(5);
+
+            // セルの中身の表示
+            tbl.rows[i+1].cells[0].innerText = i+1;
+            tbl.rows[i+1].cells[1].innerText = tasks[i]["content"];
+            tbl.rows[i+1].cells[2].innerText = tasks[i]["startTime"];
+            tbl.rows[i+1].cells[3].innerText = tasks[i]["requiredTime"];
+            tbl.rows[i+1].cells[4].innerText = tasks[i]["remarks"];
+            tbl.rows[i+1].cells[5].innerHTML = '<input type="button" value="-" name=' + tasks[i]["id"] + ' onclick=deleteData()>';
+        }
+    });
+
+    function deleteData(){
+        const btn = event.target;
+        const deleteId = btn.name;
+        let message = {
+            "type" : "delete",
+            "id" : deleteId
+        };
+        if (confirm("削除しますか？") == true) {
+            socket.emit("client_to_server", {value : message});
+        }
+    }
+
+    function registData(){
+        const content = document.getElementById('submitContent');
+        const sTime = document.getElementById('submitStime');
+        const rTime = document.getElementById('submitRtime');
+        const remarks = document.getElementById('submitRemarks');
+        let message = {
+            "type" : "regist",
+            "content" : content.value,
+            "startTime" : sTime.value,
+            "requiredTime" : rTime.value,
+            "remarks" : remarks.value
+        };
+        socket.emit("client_to_server", {value : message});
+    }
+
+    function initLoad(){
+        let message = {
+            "type" : "search"
+        };
+        socket.emit("client_to_server", {value : message});
+    }
+
+    function loadTasks(){
+        let tasks;
+        const tbl = document.getElementById('tbl');
+
+        // table初期化
+        for ( let i = tbl.rows.length-1; i > 0; i--){
+            tbl.deleteRow(i);        
+        }
+
+        for(let i=0; i<tasks.length; i++) {
+            // 一行追加
+            const row = tbl.insertRow(-1);
+            row.insertCell(0);
+            row.insertCell(1);
+            row.insertCell(2);
+            row.insertCell(3);
+            row.insertCell(4);
+
+            // セルの中身の表示
+            tbl.rows[i+1].cells[0].innerText = i+1;
+            tbl.rows[i+1].cells[1].innerText = tasks[i].content;
+            tbl.rows[i+1].cells[2].innerText = tasks[i].startTime;
+            tbl.rows[i+1].cells[3].innerText = tasks[i].requiredTime;
+            tbl.rows[i+1].cells[4].innerText = tasks[i].remarks;
+        }
+    }
+
+    function getTasks(){
+        let retTasks = [];
+        // SQL接続JSへ
+        var xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                    console.log(xhr.response);
+                    retTasks = xhr.response;
+                    tasks = xhr.response;
+                } else {
+                    console.log("status = " + xhr.status);
+                    alert("DB接続失敗");
+                }
+            }
+        };
+        xhr.open("GET", "/search");
+        xhr.responseType = "json";
+        xhr.send();
+    }
+</script>
+</html>
